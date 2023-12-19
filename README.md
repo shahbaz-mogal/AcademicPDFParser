@@ -2,7 +2,9 @@
 
 Project Aim: To rewrite lukas-blecher's Nougat project from scratch from personal learning purposes. Also aiming to productionalize this tool to an open-source free-to-use platform to practice MLOps skills.
 
-Citation:
+Citation for Nougat project:
+
+```
 @misc{blecher2023nougat,
       title={Nougat: Neural Optical Understanding for Academic Documents}, 
       author={Lukas Blecher and Guillem Cucurull and Thomas Scialom and Robert Stojnic},
@@ -11,3 +13,4 @@ Citation:
       archivePrefix={arXiv},
       primaryClass={cs.LG}
 }
+```
