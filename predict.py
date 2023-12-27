@@ -11,6 +11,8 @@ import argparse
 from pathlib import Path
 import logging
 import sys
+import pypdf
+from academicpdfparser.utils.dataset import LazyDataset
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -45,6 +47,7 @@ def get_args():
 
 def main():
     args = get_args()
+    datasets = []
     for pdf in args.pdf:
         if not pdf.exists():
             continue
@@ -55,6 +58,14 @@ def main():
                     f"Skipping {pdf.name}, already computed. Run with --recompute to convert again."
                 )
                 continue
+        try:
+            dataset = LazyDataset(pdf)
+        except pypdf.errors.PdfStreamError:
+            logging.info(f"Could not load file {str(pdf)}.")
+            continue
+        datasets.append(dataset)
+    if len(datasets) == 0:
+        return
 
 if __name__ == "__main__":
     main()
