@@ -15,6 +15,8 @@ import pypdf
 from academicpdfparser.utils.dataset import LazyDataset
 import torch
 from torch.utils.data import ConcatDataset
+from academicpdfparser.utils.device import default_batch_size
+from tqdm import tqdm
 
 
 def get_args():
@@ -76,13 +78,26 @@ def main():
         datasets.append(dataset)
     if len(datasets) == 0:
         return
-    dataloader = torch.utils.data.DataLoader(
-        ConcatDataset(datasets),
-        batch_size=args.batchsize,
-        shuffle=False,
-        collate_fn=LazyDataset.ignore_none_collate,
-    )
     
+    # Dataloader Skeleton: Currently not working since we can't load images in the loader
+    # Need to load tensors, which in this project we will convert images to tensors using 
+    # model encoder
+    # dataloader = torch.utils.data.DataLoader(
+    #     ConcatDataset(datasets),
+    #     batch_size=args.batchsize,
+    #     shuffle=False,
+    #     collate_fn=LazyDataset.ignore_none_collate,
+    # )
+
+    # Prediction Skeleton
+    # predictions = []
+
+    # for i, to_delete in enumerate(tqdm(dataloader)):
+    #     print(i, to_delete)
+        # model_output = model.inference(
+        #     image_tensors=sample, early_stopping=args.skipping
+        # )
+
 
 if __name__ == "__main__":
     main()

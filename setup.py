@@ -35,12 +35,13 @@ setup(
     ),
     install_requires=[
         "pypdf>=3.1.0",
-        "pypdfium2"
+        "pypdfium2",
+        "Pillow"
     ],
      extras_require={
        "rasterize": [
            "tqdm",
        ]  
      },
-    python_requires=">=3.7",
+    python_requires=">=3.7, <3.12",
 )

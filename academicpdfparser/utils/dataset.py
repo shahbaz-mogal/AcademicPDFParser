@@ -76,7 +76,7 @@ class LazyDataset(torch.utils.data.Dataset):
     def __getitem__(self, i):
         """Return a page image, name from the PDF document"""
         if i == 0 or self.dataset is None:
-            self.dataset = ImageDataset(self.init_fn(), self.prepare)
+            self.dataset = ImageDataset(self.init_fn())
         if i <= self.size and i >= 0:
             return self.dataset[i], self.name if i == self.size - 1 else ""
         else:
