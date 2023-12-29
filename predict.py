@@ -13,9 +13,19 @@ import logging
 import sys
 import pypdf
 from academicpdfparser.utils.dataset import LazyDataset
+import torch
+from torch.utils.data import ConcatDataset
+
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--batchsize",
+        "-b",
+        type=int,
+        default=default_batch_size(),
+        help="Batch size to use.",
+    )
     parser.add_argument("--out", "-o", type=Path, help="Output directory.")
     parser.add_argument("pdf", nargs="+", type=Path, help="PDF(s) to process.")
     args = parser.parse_args()
@@ -66,6 +76,13 @@ def main():
         datasets.append(dataset)
     if len(datasets) == 0:
         return
+    dataloader = torch.utils.data.DataLoader(
+        ConcatDataset(datasets),
+        batch_size=args.batchsize,
+        shuffle=False,
+        collate_fn=LazyDataset.ignore_none_collate,
+    )
+    
 
 if __name__ == "__main__":
     main()
