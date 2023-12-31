@@ -13,10 +13,8 @@ import logging
 import sys
 import pypdf
 from academicpdfparser.utils.dataset import LazyDataset
-import torch
-from torch.utils.data import ConcatDataset
-from academicpdfparser.utils.device import default_batch_size
-from tqdm import tqdm
+from academicpdfparser.utils.device import default_batch_size, move_to_device
+from academicpdfparser.model import AcademicPDFModel
 
 
 def get_args():
@@ -27,6 +25,11 @@ def get_args():
         type=int,
         default=default_batch_size(),
         help="Batch size to use.",
+    )
+    parser.add_argument(
+        "--full-precision",
+        action="store_true",
+        help="Use float32 instead of bfloat16. Can speed up CPU conversion for some setups.",
     )
     parser.add_argument("--out", "-o", type=Path, help="Output directory.")
     parser.add_argument("pdf", nargs="+", type=Path, help="PDF(s) to process.")
@@ -59,6 +62,12 @@ def get_args():
 
 def main():
     args = get_args()
+    model = AcademicPDFModel.from_pretrained(args.checkpoint)
+    model = move_to_device(model, bf16=not args.full_precision, cuda=args.batchsize > 0)
+    if args.batchsize <= 0:
+        # set batch size to 1. Need to check if there are benefits for CPU conversion for >1
+        args.batchsize = 1
+    model.eval()
     datasets = []
     for pdf in args.pdf:
         if not pdf.exists():
@@ -95,7 +104,7 @@ def main():
     # for i, to_delete in enumerate(tqdm(dataloader)):
     #     print(i, to_delete)
         # model_output = model.inference(
-        #     image_tensors=sample, early_stopping=args.skipping
+        #     image_tensors=sample
         # )
 
 
