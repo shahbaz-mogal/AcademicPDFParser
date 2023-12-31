@@ -37,7 +37,10 @@ setup(
         "transformers>=4.25.1",
         "pypdf>=3.1.0",
         "pypdfium2",
-        "Pillow"
+        "Pillow",
+        "opencv-python-headless",
+        "albumentations>=1.0.0",
+        "timm"
     ],
      extras_require={
        "rasterize": [
