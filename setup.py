@@ -34,6 +34,7 @@ setup(
         ]
     ),
     install_requires=[
+        "transformers>=4.25.1",
         "pypdf>=3.1.0",
         "pypdfium2",
         "Pillow"
