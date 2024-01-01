@@ -40,7 +40,7 @@ setup(
         "Pillow",
         "opencv-python-headless",
         "albumentations>=1.0.0",
-        "timm<0.9.0"
+        "timm"
     ],
      extras_require={
        "rasterize": [
