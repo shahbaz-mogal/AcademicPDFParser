@@ -591,12 +591,12 @@ class AcademicPDFModel(PreTrainedModel):
                 [StoppingCriteriaScores()] if early_stopping else []
             ),
         )
-        print("Decoder output type", type(decoder_output))
-        print("Decoder output", decoder_output)
-        print("Decoder output scores length of tuple", len(decoder_output.scores))
-        print("Decoder output scores shape", decoder_output.scores[0].shape)
-        print("Decoder output sequences shape", decoder_output.sequences[0].shape)
-        print("Decoder output sequences shape", decoder_output.sequences)
+        # print("Decoder output type", type(decoder_output))
+        # print("Decoder output", decoder_output)
+        # print("Decoder output scores length of tuple", len(decoder_output.scores))
+        # print("Decoder output scores shape", decoder_output.scores[0].shape)
+        # print("Decoder output sequences shape", decoder_output.sequences[0].shape)
+        # print("Decoder output sequences shape", decoder_output.sequences)
 
         output["repetitions"] = decoder_output.sequences.clone()
         output["sequences"] = decoder_output.sequences.clone()
@@ -644,13 +644,13 @@ class AcademicPDFModel(PreTrainedModel):
             output["repetitions"], skip_special_tokens=True
         )
 
-        decoded_sequences = self.decoder.tokenizer.batch_decode(
+        detokenized_sequences = self.decoder.tokenizer.batch_decode(
             output["sequences"], skip_special_tokens=True
             )
-        print(len(decoded_sequences))
-        print(decoded_sequences)
+        # print(len(detokenized_sequences))
+        # print(detokenized_sequences)
         # output["predictions"] = postprocess(
-        #     decoded_sequences,
+        #     detokenized_sequences,
         #     markdown_fix=False,
         # )
         
