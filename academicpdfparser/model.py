@@ -10,6 +10,7 @@ for educational purposes.
 from transformers.modeling_utils import PreTrainedModel, PretrainedConfig
 from PIL import Image
 import torch.nn.functional as F
+from academicpdfparser.utils.checkpoint import get_checkpoint
 import torch
 from collections import defaultdict
 import torch.nn as nn
@@ -679,7 +680,6 @@ class AcademicPDFModel(PreTrainedModel):
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=Path, help="Image", default=None)
-    parser.add_argument("--checkpoint", type=Path, help="Model Checkpoint", default=None)
     args = parser.parse_args()
     img_file = args.image
     print("Parsed arguments. Image File Name:", img_file)
@@ -687,8 +687,8 @@ if __name__=="__main__":
     img = Image.open(img_file)
     print("Image Opened")
     config = AcademicPDFConfig()
-    checkpoint = args.checkpoint
-    model = AcademicPDFModel.from_pretrained(checkpoint)
+    NOUGAT_CHECKPOINT = get_checkpoint()
+    model = AcademicPDFModel.from_pretrained(NOUGAT_CHECKPOINT)
     model = move_to_device(model, cuda=False)
     model.eval()
     output = model.inference(img)
