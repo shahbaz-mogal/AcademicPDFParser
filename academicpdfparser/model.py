@@ -26,6 +26,7 @@ import argparse
 from pathlib import Path
 import math
 from transformers.file_utils import ModelOutput
+from academicpdfparser.utils.device import move_to_device
 import timm
 from transformers import (
     PreTrainedTokenizerFast,
@@ -467,6 +468,19 @@ class AcademicPDFConfig(PretrainedConfig):
         self.num_heads = num_heads
         self.hidden_dimension = hidden_dimension
 
+def batch(l, b=15):
+    subs = []
+    for i in range(len(l) - b):
+        subs.append(l[i : i + b])
+    return subs
+
+
+def subdiv(l, b=10):
+    subs = []
+    for i in range(len(l) - b):
+        subs.append(l[: i + b])
+    return subs
+
 class AcademicPDFModel(PreTrainedModel):
     """
     Academic PDF Model
@@ -520,6 +534,9 @@ class AcademicPDFModel(PreTrainedModel):
         """
         output = {
             "predictions": list(),
+            "sequences": list(),
+            "repeats": list(),
+            "repetitions": list(),
         }
         if image is None and image_tensors is None:
             logging.warn("Image not found")
@@ -546,8 +563,8 @@ class AcademicPDFModel(PreTrainedModel):
             last_hidden_state=last_hidden_state, attentions=None
         )
 
-        # print("Encoder outputs type", type(encoder_outputs))
-        # print("Encoder outputs", encoder_outputs)
+        print("Encoder outputs type", type(encoder_outputs))
+        print("Encoder outputs", encoder_outputs)
 
         if len(encoder_outputs.last_hidden_state.size()) == 1:
             encoder_outputs.last_hidden_state = (
@@ -573,10 +590,68 @@ class AcademicPDFModel(PreTrainedModel):
                 [StoppingCriteriaScores()] if early_stopping else []
             ),
         )
-        # print("Decoder output type", type(decoder_output))
-        # print("Decoder output", decoder_output)
-        # print("Decoder output scores length of tuple", len(decoder_output.scores))
-        # print("Decoder output scores shape", decoder_output.scores[0].shape)
+        print("Decoder output type", type(decoder_output))
+        print("Decoder output", decoder_output)
+        print("Decoder output scores length of tuple", len(decoder_output.scores))
+        print("Decoder output scores shape", decoder_output.scores[0].shape)
+        print("Decoder output sequences shape", decoder_output.sequences[0].shape)
+        print("Decoder output sequences shape", decoder_output.sequences)
+
+        output["repetitions"] = decoder_output.sequences.clone()
+        output["sequences"] = decoder_output.sequences.clone()
+        batch_size = len(decoder_output.sequences)
+
+        logits = torch.stack(decoder_output.scores, 1).cpu().max(-1)
+        values = logits.values
+        indices = logits.indices
+
+        for b in range(batch_size):
+            mask = indices[b] != self.decoder.tokenizer.pad_token_id
+            N = mask.sum().item()
+            var = np.array(
+                [np.var(s) / len(s) for s in batch(values[b, mask].float().numpy())]
+            )
+            if len(var) < 10:
+                output["repeats"].append(None)
+                continue
+            varvar = np.array([np.var(v) for v in subdiv(var[::-1])][::-1])
+            minlen = 120
+            if (
+                indices[b] == self.decoder.tokenizer.eos_token_id
+            ).any() and N + 1 < indices.shape[1]:
+                # there is an end to the generation, likely no repetitions
+                output["repeats"].append(None)
+                continue
+            small_var = np.where(varvar < 0.045)[0]
+            if early_stopping and len(small_var) > 1:
+                if np.all(np.diff(small_var) < 2):
+                    idx = int(min(max(small_var[0], 1) * 1.08 + minlen, 4095))
+                    if idx / N > 0.9:  # at most last bit
+                        output["repeats"].append(None)
+                        continue
+                    elif small_var[0] < 30:
+                        idx = 0
+                    logging.warn("Found repetitions in sample %i" % b)
+                    output["repeats"].append(idx)
+                    output["sequences"][b, idx:] = self.decoder.tokenizer.pad_token_id
+                    output["repetitions"][b, :idx] = self.decoder.tokenizer.pad_token_id
+                else:
+                    output["repeats"].append(None)
+            else:
+                output["repeats"].append(None)
+        output["repetitions"] = self.decoder.tokenizer.batch_decode(
+            output["repetitions"], skip_special_tokens=True
+        )
+
+        decoded_sequences = self.decoder.tokenizer.batch_decode(
+            output["sequences"], skip_special_tokens=True
+            )
+        print(len(decoded_sequences))
+        print(decoded_sequences)
+        # output["predictions"] = postprocess(
+        #     decoded_sequences,
+        #     markdown_fix=False,
+        # )
         
         return output
     
@@ -604,6 +679,7 @@ class AcademicPDFModel(PreTrainedModel):
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=Path, help="Image", default=None)
+    parser.add_argument("--checkpoint", type=Path, help="Model Checkpoint", default=None)
     args = parser.parse_args()
     img_file = args.image
     print("Parsed arguments. Image File Name:", img_file)
@@ -611,6 +687,8 @@ if __name__=="__main__":
     img = Image.open(img_file)
     print("Image Opened")
     config = AcademicPDFConfig()
-    model = AcademicPDFModel(config)
+    checkpoint = args.checkpoint
+    model = AcademicPDFModel.from_pretrained(checkpoint)
+    model = move_to_device(model, cuda=False)
     model.eval()
     output = model.inference(img)
