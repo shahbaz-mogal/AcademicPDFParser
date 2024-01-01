@@ -9,6 +9,7 @@ for educational purposes.
 """
 from transformers.modeling_utils import PreTrainedModel, PretrainedConfig
 from PIL import Image
+import torch.nn.functional as F
 import torch
 import torch.nn as nn
 from torchvision.transforms.functional import resize, rotate
@@ -22,6 +23,9 @@ from timm.models.swin_transformer import SwinTransformer
 from academicpdfparser.transforms import train_transform, test_transform
 import argparse
 from pathlib import Path
+import math
+from transformers.file_utils import ModelOutput
+import timm
 
 class SwinEncoder(nn.Module):
     r"""
@@ -37,11 +41,75 @@ class SwinEncoder(nn.Module):
             self,
             input_size: List[int],
             align_long_axis: bool,
+            window_size: int,
+            encoder_layer: List[int],
+            patch_size: int,
+            embed_dim: int,
+            num_heads: List[int],
+            name_or_path: Union[str, bytes, os.PathLike] = None,
             ):
         super().__init__()
         self.input_size = input_size
         self.align_long_axis = align_long_axis
-        self.model = SwinTransformer()
+        self.window_size = window_size
+        self.encoder_layer = encoder_layer
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+
+        self.model = SwinTransformer(
+            img_size=self.input_size,
+            depths=self.encoder_layer,
+            window_size=self.window_size,
+            patch_size=self.patch_size,
+            embed_dim=self.embed_dim,
+            num_heads=self.num_heads,
+            num_classes=0,
+        )
+
+        # weight init with swin
+        if not name_or_path:
+            swin_state_dict = timm.create_model(
+                "swin_base_patch4_window12_384", pretrained=True
+            ).state_dict()
+            new_swin_state_dict = self.model.state_dict()
+            for x in new_swin_state_dict:
+                if x.endswith("relative_position_index") or x.endswith("attn_mask"):
+                    pass
+                elif (
+                    x.endswith("relative_position_bias_table")
+                    and self.model.layers[0].blocks[0].attn.window_size[0] != 12
+                ):
+                    pos_bias = swin_state_dict[x].unsqueeze(0)[0]
+                    old_len = int(math.sqrt(len(pos_bias)))
+                    new_len = int(2 * window_size - 1)
+                    pos_bias = pos_bias.reshape(1, old_len, old_len, -1).permute(
+                        0, 3, 1, 2
+                    )
+                    pos_bias = F.interpolate(
+                        pos_bias,
+                        size=(new_len, new_len),
+                        mode="bicubic",
+                        align_corners=False,
+                    )
+                    new_swin_state_dict[x] = (
+                        pos_bias.permute(0, 2, 3, 1)
+                        .reshape(1, new_len**2, -1)
+                        .squeeze(0)
+                    )
+                else:
+                    new_swin_state_dict[x] = swin_state_dict[x]
+            self.model.load_state_dict(new_swin_state_dict)
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: (batch_size, num_channels, height, width)
+        """
+        x = self.model.patch_embed(x)
+        x = self.model.pos_drop(x)
+        x = self.model.layers(x)
+        return x
     
     @staticmethod
     def crop_margin(img: Image.Image) -> Image.Image:
@@ -130,9 +198,22 @@ class AcademicPDFConfig(PretrainedConfig):
 
     Args:
         input_size:
-            Input image size (canvas size) of Nougat.encoder, SwinTransformer in this codebase
+            Input image size (canvas size) of AcademicPDFParser.encoder, SwinTransformer in this codebase
         align_long_axis:
             Whether to rotate image if height is greater than width
+        window_size:
+            Window size of AcademicPDFParser.encoder, SwinTransformer in this codebase
+        encoder_layer:
+            Depth of each AcademicPDFParser.encoder Encoder layer, SwinTransformer in this codebase
+        decoder_layer:
+            Number of hidden layers in the AcademicPDFParser.decoder, such as BART
+        max_position_embeddings
+            Trained max position embeddings in the AcademicPDFParser decoder,
+            if not specified, it will have same value with max_length
+        max_length:
+            Max position embeddings(=maximum sequence length) you want to train
+        name_or_path:
+            Name of a pretrained model name either registered in huggingface.co. or saved in local
     """
     model_type = "academicpdfparser"
 
@@ -140,11 +221,33 @@ class AcademicPDFConfig(PretrainedConfig):
         self,
         input_size: List[int] = [896, 672],
         align_long_axis: bool = False,
+        window_size: int = 7,
+        encoder_layer: List[int] = [2, 2, 14, 2],
+        decoder_layer: int = 10,
+        max_position_embeddings: int = None,
+        max_length: int = 4096,
+        name_or_path: Union[str, bytes, os.PathLike] = "",
+        patch_size: int = 4,
+        embed_dim: int = 128,
+        num_heads: List[int] = [4, 8, 16, 32],
+        hidden_dimension: int = 1024,
         **kwargs,
     ):
         super().__init__()
         self.input_size = input_size
         self.align_long_axis = align_long_axis
+        self.window_size = window_size
+        self.encoder_layer = encoder_layer
+        self.decoder_layer = decoder_layer
+        self.max_position_embeddings = (
+            max_length if max_position_embeddings is None else max_position_embeddings
+        )
+        self.max_length = max_length
+        self.name_or_path = name_or_path
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.hidden_dimension = hidden_dimension
 
 class AcademicPDFModel(PreTrainedModel):
     """
@@ -161,7 +264,12 @@ class AcademicPDFModel(PreTrainedModel):
         self.encoder = SwinEncoder(
             input_size=self.config.input_size,
             align_long_axis=self.config.align_long_axis,
-        )
+            window_size=self.config.window_size,
+            encoder_layer=self.config.encoder_layer,
+            patch_size=self.config.patch_size,
+            embed_dim=self.config.embed_dim,
+            num_heads=self.config.num_heads,
+        )        
 
     def forward(
         self,
@@ -199,9 +307,27 @@ class AcademicPDFModel(PreTrainedModel):
 
         image_tensors = image_tensors.to(self.device)
         print("Image Tensors type", type(image_tensors))
-        # Print out the shape of the image tensors
         print("Image Tensors shape", image_tensors.shape)
         print("Image Tensors", image_tensors)
+
+        last_hidden_state = self.encoder(image_tensors)
+
+        print("Encoded hidden state tensors type", type(last_hidden_state))
+        print("Encoded hidden state tensors shape", last_hidden_state.shape)
+        print("Encoded hidden state tensors", last_hidden_state)
+
+        encoder_outputs = ModelOutput(
+            last_hidden_state=last_hidden_state, attentions=None
+        )
+
+        print("Encoder outputs type", type(encoder_outputs))
+        print("Encoder outputs", encoder_outputs)
+
+        if len(encoder_outputs.last_hidden_state.size()) == 1:
+            encoder_outputs.last_hidden_state = (
+                encoder_outputs.last_hidden_state.unsqueeze(0)
+            )
+        
         return output
     
 
@@ -213,7 +339,7 @@ class AcademicPDFModel(PreTrainedModel):
         **kwargs,
     ):
         r"""
-        Instantiate a pretrained nougat model from a pre-trained model configuration
+        Instantiate a pretrained AcademicPDFParser model from a pre-trained model configuration
 
         Args:
             model_path:
