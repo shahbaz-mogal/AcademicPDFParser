@@ -12,6 +12,7 @@ from pathlib import Path
 import logging
 from functools import partial
 import torch
+import re
 from tqdm import tqdm
 from torch.utils.data import ConcatDataset
 import sys
@@ -19,7 +20,7 @@ import pypdf
 from academicpdfparser.utils.dataset import LazyDataset
 from academicpdfparser.utils.device import default_batch_size, move_to_device
 from academicpdfparser.model import AcademicPDFModel
-
+from academicpdfparser.postprocessing import markdown_compatible
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -141,13 +142,50 @@ def main():
     )
 
     predictions = []
-
-    for i, image_tensor in enumerate(tqdm(dataloader)):
-        print(i, image_tensor)
-        # model_output = model.inference(
-        #     image_tensors=sample
-        # )
-
+    file_index = 0
+    page_num = 0
+    for i, (sample, is_last_page) in enumerate(tqdm(dataloader)):
+        model_output = model.inference(
+            image_tensors=sample, early_stopping=args.skipping
+        )
+        # check if model output is faulty
+        for j, output in enumerate(model_output["predictions"]):
+            if page_num == 0:
+                logging.info(
+                    "Processing file %s with %i pages"
+                    % (datasets[file_index].name, datasets[file_index].size)
+                )
+            page_num += 1
+            if output.strip() == "[MISSING_PAGE_POST]":
+                # uncaught repetitions -- most likely empty page
+                predictions.append(f"\n\n[MISSING_PAGE_EMPTY:{page_num}]\n\n")
+            elif args.skipping and model_output["repeats"][j] is not None:
+                if model_output["repeats"][j] > 0:
+                    # If we end up here, it means the output is most likely not complete and was truncated.
+                    logging.warning(f"Skipping page {page_num} due to repetitions.")
+                    predictions.append(f"\n\n[MISSING_PAGE_FAIL:{page_num}]\n\n")
+                else:
+                    # If we end up here, it means the document page is too different from the training domain.
+                    # This can happen e.g. for cover pages.
+                    predictions.append(
+                        f"\n\n[MISSING_PAGE_EMPTY:{i*args.batchsize+j+1}]\n\n"
+                    )
+            else:
+                if args.markdown:
+                    output = markdown_compatible(output)
+                predictions.append(output)
+            if is_last_page[j]:
+                out = "".join(predictions).strip()
+                out = re.sub(r"\n{3,}", "\n\n", out).strip()
+                if args.out:
+                    out_path = args.out / Path(is_last_page[j]).with_suffix(".mmd").name
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text(out, encoding="utf-8")
+                else:
+                    print(out, "\n\n")
+                predictions = []
+                page_num = 0
+                file_index += 1
 
 if __name__ == "__main__":
     main()
