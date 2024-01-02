@@ -37,10 +37,7 @@ class ImageDataset(torch.utils.data.Dataset):
     
     def __getitem__(self, idx):
         try:
-            print("Trying Image opening")
             img = Image.open(self.img_list[idx])
-            print("Image opened")
-            print(img)
             return self.prepare(img)
         except Exception as e:
             logging.error(e)

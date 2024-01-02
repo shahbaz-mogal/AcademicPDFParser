@@ -128,26 +128,22 @@ def main():
             logging.info(f"Could not load file {str(pdf)}.")
             continue
         datasets.append(dataset)
-    print("Length of loaded PDF datasets:", len(datasets))
-    print("Sample PDF datasets", datasets[0])
+    # print("Length of loaded PDF datasets:", len(datasets))
+    # print("Sample PDF datasets", datasets[0])
     if len(datasets) == 0:
         return
     
-    # Dataloader Skeleton: Currently not working since we can't load images in the loader
-    # Need to load tensors, which in this project we will convert images to tensors using 
-    # model encoder
-    # dataloader = torch.utils.data.DataLoader(
-    #     ConcatDataset(datasets),
-    #     batch_size=args.batchsize,
-    #     shuffle=False,
-    #     collate_fn=LazyDataset.ignore_none_collate,
-    # )
+    dataloader = torch.utils.data.DataLoader(
+        ConcatDataset(datasets),
+        batch_size=args.batchsize,
+        shuffle=False,
+        collate_fn=LazyDataset.ignore_none_collate,
+    )
 
-    # Prediction Skeleton
-    # predictions = []
+    predictions = []
 
-    # for i, dataloader_item in enumerate(tqdm(dataloader)):
-    #     print(i, dataloader_item)
+    for i, image_tensor in enumerate(tqdm(dataloader)):
+        print(i, image_tensor)
         # model_output = model.inference(
         #     image_tensors=sample
         # )
