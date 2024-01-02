@@ -218,7 +218,7 @@ class BARTDecoder(nn.Module):
             tokenizer_file = Path(name_or_path) / "tokenizer.json"
         if not tokenizer_file.exists():
             raise ValueError("Could not find tokenizer file")
-        print("Tokenizer file:", str(tokenizer_file))
+        # print("Tokenizer file:", str(tokenizer_file))
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_file=str(tokenizer_file))
         self.tokenizer.pad_token = "<pad>"
         self.tokenizer.bos_token = "<s>"
@@ -565,8 +565,8 @@ class AcademicPDFModel(PreTrainedModel):
             last_hidden_state=last_hidden_state, attentions=None
         )
 
-        print("Encoder outputs type", type(encoder_outputs))
-        print("Encoder outputs", encoder_outputs)
+        # print("Encoder outputs type", type(encoder_outputs))
+        # print("Encoder outputs", encoder_outputs)
 
         if len(encoder_outputs.last_hidden_state.size()) == 1:
             encoder_outputs.last_hidden_state = (
@@ -648,14 +648,14 @@ class AcademicPDFModel(PreTrainedModel):
         detokenized_sequences = self.decoder.tokenizer.batch_decode(
             output["sequences"], skip_special_tokens=True
             )
-        print("Length of Detokenized Sequences", len(detokenized_sequences[0]))
-        print("Detokenized Sequences", detokenized_sequences)
+        # print("Length of Detokenized Sequences", len(detokenized_sequences[0]))
+        # print("Detokenized Sequences", detokenized_sequences)
         output["predictions"] = postprocess(
             detokenized_sequences,
             markdown_fix=False,
         )
-        print("Length of postprocessed Sequences", len(output["predictions"][0]))
-        print("Postprocessed Sequences", output["predictions"])
+        # print("Length of postprocessed Sequences", len(output["predictions"][0]))
+        # print("Postprocessed Sequences", output["predictions"])
 
         if return_attentions:
             output["attentions"] = {
@@ -691,10 +691,10 @@ if __name__=="__main__":
     parser.add_argument("--image", type=Path, help="Image", default=None)
     args = parser.parse_args()
     img_file = args.image
-    print("Parsed arguments. Image File Name:", img_file)
+    # print("Parsed arguments. Image File Name:", img_file)
     assert img_file.exists() and img_file.is_file()
     img = Image.open(img_file)
-    print("Image Opened")
+    # print("Image Opened")
     config = AcademicPDFConfig()
     NOUGAT_CHECKPOINT = get_checkpoint()
     model = AcademicPDFModel.from_pretrained(NOUGAT_CHECKPOINT)
