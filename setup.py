@@ -34,13 +34,20 @@ setup(
         ]
     ),
     install_requires=[
+        "transformers>=4.25.1",
         "pypdf>=3.1.0",
-        "pypdfium2"
+        "pypdfium2",
+        "Pillow",
+        "nltk",
+        "python-Levenshtein",
+        "opencv-python-headless",
+        "albumentations>=1.0.0",
+        "timm"
     ],
      extras_require={
        "rasterize": [
            "tqdm",
        ]  
      },
-    python_requires=">=3.7",
+    python_requires=">=3.7, <3.12",
 )

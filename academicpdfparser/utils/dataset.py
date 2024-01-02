@@ -6,6 +6,7 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 """
 
 import logging
+from typing import Callable
 from academicpdfparser.dataset.rasterize import rasterize_paper
 from functools import partial
 from PIL import Image
@@ -20,13 +21,16 @@ class ImageDataset(torch.utils.data.Dataset):
 
     Args:
         img_list (list): List of image paths.
+        prepare (Callable): A preparation function to process the images.
 
     Attributes:
         img_list (list): List of image paths.
+        prepare (Callable): The preparation function.
     """
-    def __init__(self, img_list):
+    def __init__(self, img_list, prepare: Callable):
         super().__init__()
         self.img_list = img_list
+        self.prepare = prepare
 
     def __len__(self):
         return len(self.img_list)
@@ -34,7 +38,7 @@ class ImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         try:
             img = Image.open(self.img_list[idx])
-            return img
+            return self.prepare(img)
         except Exception as e:
             logging.error(e)
     
@@ -59,12 +63,14 @@ class LazyDataset(torch.utils.data.Dataset):
 
     Args:
         pdf (str): Path to the PDF document.
+        prepare (Callable): A preparation function to process the images.
 
     Attributes:
         name (str): Name of the PDF document.
     """
-    def __init__(self, pdf):
+    def __init__(self, pdf, prepare: Callable):
         super().__init__()
+        self.prepare = prepare
         self.name = str(pdf)
         self.init_fn = partial(rasterize_paper, pdf)
         self.dataset = None
