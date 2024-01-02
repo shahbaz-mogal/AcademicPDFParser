@@ -10,6 +10,10 @@ for educational purposes.
 import argparse
 from pathlib import Path
 import logging
+from functools import partial
+import torch
+from tqdm import tqdm
+from torch.utils.data import ConcatDataset
 import sys
 import pypdf
 from academicpdfparser.utils.dataset import LazyDataset
@@ -27,9 +31,45 @@ def get_args():
         help="Batch size to use.",
     )
     parser.add_argument(
+        "--checkpoint",
+        "-c",
+        type=Path,
+        default=None,
+        help="Path to checkpoint directory.",
+    )
+    parser.add_argument(
+        "--model",
+        "-m",
+        type=str,
+        default="0.1.0-small",
+        help=f"Model tag to use.",
+    )
+    parser.add_argument(
+        "--recompute",
+        action="store_true",
+        help="Recompute already computed PDF, discarding previous predictions.",
+    )
+    parser.add_argument(
         "--full-precision",
         action="store_true",
         help="Use float32 instead of bfloat16. Can speed up CPU conversion for some setups.",
+    )
+    parser.add_argument(
+        "--no-markdown",
+        dest="markdown",
+        action="store_false",
+        help="Do not add postprocessing step for markdown compatibility.",
+    )
+    parser.add_argument(
+        "--markdown",
+        action="store_true",
+        help="Add postprocessing step for markdown compatibility (default).",
+    )
+    parser.add_argument(
+        "--no-skipping",
+        dest="skipping",
+        action="store_false",
+        help="Don't apply failure detection heuristic.",
     )
     parser.add_argument("--out", "-o", type=Path, help="Output directory.")
     parser.add_argument("pdf", nargs="+", type=Path, help="PDF(s) to process.")
@@ -80,11 +120,16 @@ def main():
                 )
                 continue
         try:
-            dataset = LazyDataset(pdf)
+            dataset = LazyDataset(
+                pdf,
+                partial(model.encoder.prepare_input, random_padding=False),
+            )
         except pypdf.errors.PdfStreamError:
             logging.info(f"Could not load file {str(pdf)}.")
             continue
         datasets.append(dataset)
+    print("Length of loaded PDF datasets:", len(datasets))
+    print("Sample PDF datasets", datasets[0])
     if len(datasets) == 0:
         return
     
@@ -101,8 +146,8 @@ def main():
     # Prediction Skeleton
     # predictions = []
 
-    # for i, to_delete in enumerate(tqdm(dataloader)):
-    #     print(i, to_delete)
+    # for i, dataloader_item in enumerate(tqdm(dataloader)):
+    #     print(i, dataloader_item)
         # model_output = model.inference(
         #     image_tensors=sample
         # )
