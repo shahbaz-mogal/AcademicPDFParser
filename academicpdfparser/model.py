@@ -29,6 +29,7 @@ import math
 from transformers.file_utils import ModelOutput
 from academicpdfparser.utils.device import move_to_device
 import timm
+from academicpdfparser.postprocessing import postprocess
 from transformers import (
     PreTrainedTokenizerFast,
     StoppingCriteria,
@@ -647,12 +648,20 @@ class AcademicPDFModel(PreTrainedModel):
         detokenized_sequences = self.decoder.tokenizer.batch_decode(
             output["sequences"], skip_special_tokens=True
             )
-        # print(len(detokenized_sequences))
-        # print(detokenized_sequences)
-        # output["predictions"] = postprocess(
-        #     detokenized_sequences,
-        #     markdown_fix=False,
-        # )
+        print("Length of Detokenized Sequences", len(detokenized_sequences[0]))
+        print("Detokenized Sequences", detokenized_sequences)
+        output["predictions"] = postprocess(
+            detokenized_sequences,
+            markdown_fix=False,
+        )
+        print("Length of postprocessed Sequences", len(output["predictions"][0]))
+        print("Postprocessed Sequences", output["predictions"])
+
+        if return_attentions:
+            output["attentions"] = {
+                "self_attentions": decoder_output.decoder_attentions,
+                "cross_attentions": decoder_output.cross_attentions,
+            }
         
         return output
     

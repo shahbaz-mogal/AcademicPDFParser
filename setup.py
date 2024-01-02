@@ -38,6 +38,8 @@ setup(
         "pypdf>=3.1.0",
         "pypdfium2",
         "Pillow",
+        "nltk",
+        "python-Levenshtein",
         "opencv-python-headless",
         "albumentations>=1.0.0",
         "timm"
