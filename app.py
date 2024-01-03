@@ -16,7 +16,7 @@ from academicpdfparser.utils.checkpoint import get_checkpoint
 from academicpdfparser.dataset.rasterize import rasterize_paper
 from academicpdfparser.utils.device import move_to_device, default_batch_size
 from tqdm import tqdm
-import time
+from datetime import datetime
 from pydantic import BaseModel
 
 SAVE_DIR = Path("./pdfs")
@@ -66,6 +66,8 @@ def root():
 class PredictionResponse(BaseModel):
     result: str
     time_taken: float
+    start_time: str
+    end_time: str
 
 @app.post("/predict/", response_model=PredictionResponse)
 async def predict(
@@ -83,7 +85,9 @@ async def predict(
         str: The extracted text in Markdown format.
     """
     print("Request received for %s" % file.filename)
-    start_time = time.time()  # start the timer
+    now = datetime.now()
+    start_time = now.timestamp()  # start the timer
+    start_datetime_str = now.strftime("%I:%M:%S %p")
     pdfbin = file.file.read()
     pdf = pypdfium2.PdfDocument(pdfbin)
     md5 = hashlib.md5(pdfbin).hexdigest()
@@ -150,11 +154,14 @@ async def predict(
     final = "".join(predictions).strip()
     (save_path / "doc.mmd").write_text(final, encoding="utf-8")
 
-    end_time = time.time()  # end the timer
+    now = datetime.now()
+    end_time = now.timestamp()  # start the timer
+    end_datetime_str = now.strftime("%I:%M:%S %p")
     elapsed_time = end_time - start_time  # calculate elapsed time
 
     # return the result along with the elapsed time
-    return {"result": final, "time_taken": elapsed_time}
+    return {"result": final, "time_taken": elapsed_time, 
+            "start_time": start_datetime_str, "end_time": end_datetime_str}
 
 
 def main():
