@@ -45,6 +45,11 @@ setup(
         "timm"
     ],
      extras_require={
+         "api": [
+            "fastapi",
+            "uvicorn[standard]",
+            "python-multipart",
+        ],
        "rasterize": [
            "tqdm",
        ]  

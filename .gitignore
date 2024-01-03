@@ -1,6 +1,28 @@
+result/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 
 # Distribution / packaging
 build/
 *.egg-info/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Misc
+pdfs
