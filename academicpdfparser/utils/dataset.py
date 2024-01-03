@@ -1,10 +1,3 @@
-"""
-Donut
-Copyright (c) 2022-present NAVER Corp.
-MIT License
-Copyright (c) Meta Platforms, Inc. and affiliates.
-"""
-
 import logging
 from typing import Callable
 from academicpdfparser.dataset.rasterize import rasterize_paper

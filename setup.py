@@ -1,12 +1,3 @@
-"""
-Donut
-Copyright (c) 2022-present NAVER Corp.
-MIT License
-Copyright (c) Meta Platforms, Inc. and affiliates.
-
-Used by Shahbaz Mogal (shahbazmogal@outlook.com) 
-for educational purposes.
-"""
 import os
 from setuptools import find_packages, setup
 
