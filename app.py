@@ -22,7 +22,8 @@ from academicpdfparser.utils.checkpoint import get_checkpoint
 from academicpdfparser.dataset.rasterize import rasterize_paper
 from academicpdfparser.utils.device import move_to_device, default_batch_size
 from tqdm import tqdm
-
+import time
+from pydantic import BaseModel
 
 SAVE_DIR = Path("./pdfs")
 BATCHSIZE = int(os.environ.get("NOUGAT_BATCHSIZE", default_batch_size()))
@@ -68,10 +69,13 @@ def root():
     }
     return response
 
+class PredictionResponse(BaseModel):
+    result: str
+    time_taken: float
 
-@app.post("/predict/")
+@app.post("/predict/", response_model=PredictionResponse)
 async def predict(
-    file: UploadFile = File(...), start: int = None, stop: int = None
+    file: UploadFile = File(...)
 ) -> str:
     """
     Perform predictions on a PDF document and return the extracted text in Markdown format.
@@ -84,6 +88,8 @@ async def predict(
     Returns:
         str: The extracted text in Markdown format.
     """
+    print("Request received for %s" % file.filename)
+    start_time = time.time()  # start the timer
     pdfbin = file.file.read()
     pdf = pypdfium2.PdfDocument(pdfbin)
     md5 = hashlib.md5(pdfbin).hexdigest()
@@ -98,6 +104,7 @@ async def predict(
                 print(e)
     images = rasterize_paper(pdf)
     global model
+    print("Rasterized PDF %s and engaged model for processing" % file.filename)
 
     dataset = ImageDataset(
         images,
@@ -115,6 +122,7 @@ async def predict(
         if sample is None:
             continue
         model_output = model.inference(image_tensors=sample)
+        print("Received model output for PDF %s" % file.filename)
         for j, output in enumerate(model_output["predictions"]):
             if model_output["repeats"][j] is not None:
                 if model_output["repeats"][j] > 0:
@@ -147,7 +155,12 @@ async def predict(
         )
     final = "".join(predictions).strip()
     (save_path / "doc.mmd").write_text(final, encoding="utf-8")
-    return final
+
+    end_time = time.time()  # end the timer
+    elapsed_time = end_time - start_time  # calculate elapsed time
+
+    # return the result along with the elapsed time
+    return {"result": final, "time_taken": elapsed_time}
 
 
 def main():
